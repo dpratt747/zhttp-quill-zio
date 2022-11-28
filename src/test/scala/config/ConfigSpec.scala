@@ -2,6 +2,7 @@ package github.com.dpratt747
 package config
 
 import config.*
+import domain.*
 import helper.*
 
 import zio.*
@@ -12,13 +13,12 @@ import zio.test.Assertion.*
 
 object ConfigSpec extends ZIOSpecDefault {
   override def spec: Spec[Any, ReadError[String]] =
-    suite("ConfigSpec")(
+    suite("ApplicationConfig")(
       test("can load successfully") {
         (for {
-          env <- ZIO.environment[ApplicationConfig]
-          appConfig = env.get[ApplicationConfig]
-        } yield assertTrue(appConfig.server.port == 8080))
-          .provideLayer(configLayer)
+          appConfig <- ZIO.service[ApplicationConfig]
+        } yield assertTrue(appConfig.server.port.asInt == 8080))
+          .provide(configLayer)
       },
       test("cannot load successfully") {
         val invalidConfig: ConfigSource = TypesafeConfigSource
@@ -30,14 +30,13 @@ object ConfigSpec extends ZIOSpecDefault {
                |""".stripMargin
           )
 
-        val invalidConfigLayer = ZLayer(read(configDescriptor from invalidConfig))
+        val invalidConfigLayer = ZLayer(read(applicationConfigDescriptor from invalidConfig))
 
         val result: ReadError[String] = (for {
-          env <- ZIO.environment[ApplicationConfig]
-          appConfig = env.get[ApplicationConfig]
+          appConfig <- ZIO.service[ApplicationConfig]
         } yield appConfig.server.port
           )
-          .provideLayer(invalidConfigLayer)
+          .provide(invalidConfigLayer)
           .flip
           .unsafeRun
 
@@ -49,7 +48,7 @@ object ConfigSpec extends ZIOSpecDefault {
             .stripLineEnd
             .stripLeading()
 
-        assertTrue(resultingErrorMessage == result.nonPrettyPrintedString)
+        assertTrue(result.nonPrettyPrintedString.contains(resultingErrorMessage))
       }
     )
 }

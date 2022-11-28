@@ -13,9 +13,9 @@ import zio.config.typesafe.TypesafeConfigSource
 import zio.config.{ConfigSource, ReadError, read}
 import zio.test.*
 import zio.test.Assertion.*
+import endpoints.*
 
-object EndpointsSpec extends ZIOSpecDefault {
-
+object GetEndpointsSpec extends ZIOSpecDefault {
   override def spec =
     suite("Get")(
       test("/example returns Ok") {
@@ -25,10 +25,9 @@ object EndpointsSpec extends ZIOSpecDefault {
         val request: Request = Request(url = URL(path))
         for {
           response <- Get.routes(request)
-          body <- response.body.asArray
-          decodedResponse <- ZIO.fromEither(decodeByteArray[ZioHttpExampleJsonResponse](body))
+          decodedResponse <-  response.body.decodeJsonBody[ZioHttpExampleJsonResponse]
         } yield assertTrue(response.status == Status.Ok)
-          && assertTrue(decodedResponse == ZioHttpExampleJsonResponse("Hello World!"))
+          && assertTrue(decodedResponse == ZioHttpExampleJsonResponse(ResponseString("Hello World!")))
       },
       test("/invalidRoute returns NotFound") {
         val path: Path = Path.root ++ Path(Vector(

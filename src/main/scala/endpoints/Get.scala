@@ -14,11 +14,22 @@ import zhttp.socket.*
 import zio.*
 import endpoints.*
 
-object Get {
+trait GetInterface {
+  val routes: Http[Any, Throwable, Request, Response]
+}
+
+object Get extends GetInterface:
 
   val routes: Http[Any, Throwable, Request, Response] = Http.collectZIO[Request] {
-    case Method.GET -> !! / "example" => ZIO.attempt(Response.json(ZioHttpExampleJsonResponse("Hello World!").toJsonString))
+    case Method.GET -> !! / "example" =>
+      ZIO.attempt(
+        Response.json(
+          ZioHttpExampleJsonResponse(
+            ResponseString("Hello World!")
+          ).toJsonString
+        )
+      )
     case _ => ZIO.succeed(Response.status(Status.NotFound))
   }
 
-}
+end Get

@@ -14,12 +14,19 @@ import zhttp.service.ChannelEvent.*
 import zhttp.socket.*
 import zio.*
 
-object Post {
+trait PostInterface {
+  val routes: Http[Any, Throwable, Request, Response]
+}
+object Post extends PostInterface {
 
   val routes: Http[Any, Throwable, Request, Response] = Http.collectZIO[Request] {
     case req @ Method.POST -> !! / "user" =>
-      ZIO.attempt(println(req.body)) *> ZIO.attempt(Response.ok)
-    case _ => ZIO.succeed(Response.status(Status.NotFound))
+      for {
+        createUser <- req.body.decodeJsonBody[User]
+        res <- ZIO.attempt(Response.ok)
+      } yield res
+    case _ =>
+      ZIO.succeed(Response.status(Status.NotFound))
   }
 
 }

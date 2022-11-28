@@ -2,12 +2,13 @@ package github.com.dpratt747
 package server
 
 import config.{ApplicationConfig, configLayer}
-
+import domain.*
 import endpoints.*
+
 import zhttp.http.*
+import zhttp.service
 import zhttp.service.*
 import zio.*
-import zhttp.service
 
 object WebServer extends ZIOAppDefault {
 
@@ -15,7 +16,8 @@ object WebServer extends ZIOAppDefault {
     (for {
       env <- ZIO.environment[ApplicationConfig]
       config = env.get[ApplicationConfig]
-      _ <- Server.start(config.server.port, Get.routes)
+      port = config.server.port.asInt
+      _ <- Server.start(port, Get.routes)
     } yield ())
       .provideLayer(configLayer)
 
