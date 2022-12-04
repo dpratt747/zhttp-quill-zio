@@ -1,30 +1,40 @@
 package github.com.dpratt747
 package programs
 
-import github.com.dpratt747.hash.PasswordHashingAlg
+import hash.PasswordHashingAlg
 import zio.*
 import domain.*
 
+import db.repositories.UserRepositoryAlg
+
+import javax.sql.DataSource
+
 trait CreateUserProgramAlg {
-  def createUser(user: User): Task[Unit]
+  def createUser(user: User): ZIO[Any, Throwable, Unit]
 }
 
 final case class CreateUserProgram(
-    private val passwordHashingAlg: PasswordHashingAlg
+    private val passwordHashingAlg: PasswordHashingAlg,
+    private val userRepo: UserRepositoryAlg
 ) extends CreateUserProgramAlg {
-  override def createUser(user: User): Task[Unit] =
+  def createUser(user: User): ZIO[Any, Throwable, Unit] =
     for {
       hash <- passwordHashingAlg.hash(user.password.asString)
       newUser <- ZIO.attempt(user.copy(password = Password(hash.getResult)))
-      _ = println(newUser)
-      _ = println(hash.getSalt)
+      _ <- userRepo.insertUser(newUser, Salt(hash.getSalt))
     } yield ()
 }
 
 object CreateUserProgram {
-  val live: ZLayer[PasswordHashingAlg, Nothing, CreateUserProgram] = ZLayer.fromZIO{
-    for {
-      hashingAlg <- ZIO.service[PasswordHashingAlg]
-    } yield CreateUserProgram(hashingAlg)
-  }
+  val live: ZLayer[
+    UserRepositoryAlg with PasswordHashingAlg,
+    Nothing,
+    CreateUserProgram
+  ] =
+    ZLayer.fromZIO {
+      for {
+        hashingAlg <- ZIO.service[PasswordHashingAlg]
+        userRepo <- ZIO.service[UserRepositoryAlg]
+      } yield CreateUserProgram(hashingAlg, userRepo)
+    }
 }

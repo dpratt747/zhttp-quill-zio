@@ -19,24 +19,28 @@ object GetEndpointsSpec extends ZIOSpecDefault {
   override def spec =
     suite("Get")(
       test("/example returns Ok") {
-        val path: Path = Path.root ++ Path(Vector(
-          Path.Segment("example"))
-        )
+        val path: Path = Path.root ++ Path(Vector(Path.Segment("example")))
         val request: Request = Request(url = URL(path))
-        for {
-          response <- Get.routes(request)
-          decodedResponse <-  response.body.decodeJsonBody[ZioHttpExampleJsonResponse]
+        (for {
+          get <- ZIO.service[GetAlg]
+          response <- get.routes(request)
+          decodedResponse <- response.body
+            .decodeJsonBody[ZioHttpExampleJsonResponse]
         } yield assertTrue(response.status == Status.Ok)
-          && assertTrue(decodedResponse == ZioHttpExampleJsonResponse(ResponseString("Hello World!")))
+          && assertTrue(
+            decodedResponse == ZioHttpExampleJsonResponse(
+              ResponseString("Hello World!")
+            )
+          )).provide(Get.live)
       },
       test("/invalidRoute returns NotFound") {
-        val path: Path = Path.root ++ Path(Vector(
-          Path.Segment("invalidRoute"))
-        )
+        val path: Path = Path.root ++ Path(Vector(Path.Segment("invalidRoute")))
         val request: Request = Request(url = URL(path))
-        for {
-          response <- Get.routes(request)
-        } yield assertTrue(response.status == Status.NotFound)
+        (for {
+          get <- ZIO.service[GetAlg]
+          response <- get.routes(request)
+        } yield assertTrue(response.status == Status.NotFound))
+          .provide(Get.live)
       }
     )
 }

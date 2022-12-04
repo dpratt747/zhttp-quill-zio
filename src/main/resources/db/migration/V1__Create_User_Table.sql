@@ -6,8 +6,8 @@ CREATE TABLE IF NOT EXISTS user_table (
     password_hash TEXT NOT NULL
 );
 
--- CREATE TABLE IF NOT EXISTS hash_salt_table (
---     id SERIAL PRIMARY KEY,
---     user_id INTEGER REFERENCES user_table(id) NOT NULL,
---     salt TEXT NOT NULL
--- );
+CREATE TABLE IF NOT EXISTS hash_salt_table (
+    id SERIAL PRIMARY KEY,
+    user_id INTEGER REFERENCES user_table(id) NOT NULL,
+    salt TEXT NOT NULL
+);

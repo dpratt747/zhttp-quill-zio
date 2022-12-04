@@ -15,12 +15,12 @@ import zio.config.ConfigSource
 import zio.config.ReadError
 import zio.config.read
 import zio.config.typesafe.TypesafeConfigSource
-import zio.interop.*
-import zio.interop.catz.*
+// import zio.interop.*
+// import zio.interop.catz.*
 import zio.test.Assertion.*
 import zio.test.*
 
-import scala.jdk.CollectionConverters.*
+// import scala.jdk.CollectionConverters.*
 
 import config.{ApplicationConfig, configLayer}
 import domain.*
@@ -36,11 +36,11 @@ object PostgresSessionSpec extends ZIOSpecDefault {
       test(
         "can create a session and transaction that allows for insertion"
       ) {
-        checkN(30)(Gen.string, Gen.string, Gen.string, Gen.string) { (userName, firstName, lastName, passwordHash) =>
+        checkN(15)(Gen.string, Gen.string, Gen.string, Gen.string) { (userName, firstName, lastName, passwordHash) =>
 
             def action(
                 pgContext: PostgresZioJdbcContext[SnakeCase.type]
-            ): ZIO[DataSource, SQLException, Long] = {
+            ): ZIO[DataSource, Throwable, List[UserTable]] = {
               import pgContext.*
 
               val insertUserRowQuote: Quoted[Insert[UserTable]] = quote {
@@ -52,21 +52,25 @@ object PostgresSessionSpec extends ZIOSpecDefault {
                 )
               }
 
-              // pgContext.transaction{
-                pgContext.run[UserTable](insertUserRowQuote)
-              // }     
+              val selectUserQuote: Quoted[EntityQuery[UserTable]] = quote {
+                query[UserTable].filter(_.userName == lift(userName))
+              }
+
+              pgContext.transaction {
+                for {
+                  _ <- pgContext.run[UserTable](insertUserRowQuote)
+                  res <- pgContext.run[UserTable](selectUserQuote)
+                } yield res
+              }
             }
 
             (for {
-              _ <- ZIO.serviceWithZIO[FlywayMigrationsAlg](_.migrate)
-              config <- ZIO.serviceWith[ApplicationConfig](_.postgres)
-              context <- ZIO.serviceWith[PostgresContextAlg](_.pgContext)
+              context <- ZIO.serviceWith[PostgresContextAlg](_.context)
               insertResult <- action(context)
-            } yield assertTrue(insertResult == 1L))
+              _ = println(insertResult)
+            } yield assertTrue(insertResult.length == 1))
               .provide(
-                PostgresDataSource.live,
                 PostgresContext.live,
-                FlywayMigrations.live,
                 configLayer
               )
         }

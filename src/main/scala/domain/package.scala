@@ -14,24 +14,42 @@ opaque type ResponseString = String
 opaque type Port = Int
 opaque type ConnectionTimeout = Int
 opaque type Database = String
+opaque type Salt = String
 
-implicit val responseStringEncoder: Encoder[ResponseString] = Encoder.encodeString.contramap[ResponseString](identity)
-implicit val responseStringDecoder: Decoder[ResponseString] = Decoder.decodeString.map[ResponseString](identity)
+implicit val responseStringEncoder: Encoder[ResponseString] =
+  Encoder.encodeString.contramap[ResponseString](identity)
+implicit val responseStringDecoder: Decoder[ResponseString] =
+  Decoder.decodeString.map[ResponseString](identity)
 
-implicit val userNameEncoder: Encoder[UserName] = Encoder.encodeString.contramap[UserName](identity)
-implicit val userNameDecoder: Decoder[UserName] = Decoder.decodeString.map[UserName](identity)
+implicit val userNameEncoder: Encoder[UserName] =
+  Encoder.encodeString.contramap[UserName](identity)
+implicit val userNameDecoder: Decoder[UserName] =
+  Decoder.decodeString.map[UserName](identity)
 
-implicit val serverNameEncoder: Encoder[ServerName] = Encoder.encodeString.contramap[ServerName](identity)
-implicit val serverNameDecoder: Decoder[ServerName] = Decoder.decodeString.map[ServerName](identity)
+implicit val saltEncoder: Encoder[Salt] =
+  Encoder.encodeString.contramap[Salt](identity)
+implicit val saltDecoder: Decoder[Salt] =
+  Decoder.decodeString.map[Salt](identity)
 
-implicit val firstNameEncoder: Encoder[FirstName] = Encoder.encodeString.contramap[FirstName](identity)
-implicit val firstNameDecoder: Decoder[FirstName] = Decoder.decodeString.map[FirstName](identity)
+implicit val serverNameEncoder: Encoder[ServerName] =
+  Encoder.encodeString.contramap[ServerName](identity)
+implicit val serverNameDecoder: Decoder[ServerName] =
+  Decoder.decodeString.map[ServerName](identity)
 
-implicit val lastNameEncoder: Encoder[LastName] = Encoder.encodeString.contramap[LastName](identity)
-implicit val lastNameDecoder: Decoder[LastName] = Decoder.decodeString.map[LastName](identity)
+implicit val firstNameEncoder: Encoder[FirstName] =
+  Encoder.encodeString.contramap[FirstName](identity)
+implicit val firstNameDecoder: Decoder[FirstName] =
+  Decoder.decodeString.map[FirstName](identity)
 
-implicit val passwordEncoder: Encoder[Password] = Encoder.encodeString.contramap[Password](identity)
-implicit val passwordDecoder: Decoder[Password] = Decoder.decodeString.map[Password](identity)
+implicit val lastNameEncoder: Encoder[LastName] =
+  Encoder.encodeString.contramap[LastName](identity)
+implicit val lastNameDecoder: Decoder[LastName] =
+  Decoder.decodeString.map[LastName](identity)
+
+implicit val passwordEncoder: Encoder[Password] =
+  Encoder.encodeString.contramap[Password](identity)
+implicit val passwordDecoder: Decoder[Password] =
+  Decoder.decodeString.map[Password](identity)
 
 object UserName {
   def apply(string: String): UserName = string
@@ -47,6 +65,10 @@ object LastName {
 
 object Password {
   def apply(string: String): Password = string
+}
+
+object Salt {
+  def apply(string: String): Salt = string
 }
 
 object ResponseString {
@@ -73,7 +95,7 @@ object ServerName {
   def apply(string: String): ServerName = string
 }
 
-extension (input: UserName | Password | Database | Host | ServerName) {
+extension (input: UserName | FirstName | LastName | Password | Database | Host | ServerName | Salt) {
   def asString: String = input
 }
 
@@ -87,12 +109,12 @@ sealed trait JsonResponse extends DomainJson
 
 sealed trait Payload extends DomainJson
 
-final case class ZioHttpExampleJsonResponse(response: ResponseString) extends JsonResponse
+final case class ZioHttpExampleJsonResponse(response: ResponseString)
+    extends JsonResponse
 
 final case class User(
-                             userName: UserName,
-                             firstName: FirstName,
-                             lastName: LastName,
-                             password: Password
-                           ) extends Payload
-                      
+    userName: UserName,
+    firstName: FirstName,
+    lastName: LastName,
+    password: Password
+) extends Payload

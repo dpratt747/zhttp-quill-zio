@@ -5,6 +5,10 @@ import config.{ApplicationConfig, configLayer}
 import domain.*
 import endpoints.*
 
+import github.com.dpratt747.db.repositories.UserRepository
+import github.com.dpratt747.db.session.PostgresContext
+import github.com.dpratt747.hash.PasswordHashing
+import github.com.dpratt747.programs.CreateUserProgram
 import zhttp.http.*
 import zhttp.service
 import zhttp.service.*
@@ -14,11 +18,19 @@ object WebServer extends ZIOAppDefault {
 
   override def run: ZIO[Any, Throwable, Unit] =
     (for {
-      env <- ZIO.environment[ApplicationConfig]
-      config = env.get[ApplicationConfig]
-      port = config.server.port.asInt
-      _ <- Server.start(port, Get.routes)
+      port <- ZIO.serviceWith[ApplicationConfig](_.server.port)
+      postR <- ZIO.serviceWith[PostAlg](_.routes)
+      getR <- ZIO.serviceWith[GetAlg](_.routes)
+      _ <- Server.start(port.asInt, getR ++ postR)
     } yield ())
-      .provideLayer(configLayer)
+      .provide(
+        configLayer,
+        Get.live,
+        Post.live,
+        PostgresContext.live,
+        CreateUserProgram.live,
+        UserRepository.live,
+        PasswordHashing.live
+      )
 
 }

@@ -14,11 +14,11 @@ import zhttp.socket.*
 import zio.*
 import endpoints.*
 
-trait GetInterface {
+trait GetAlg {
   val routes: Http[Any, Throwable, Request, Response]
 }
 
-object Get extends GetInterface:
+final case class Get() extends GetAlg {
 
   val routes: Http[Any, Throwable, Request, Response] = Http.collectZIO[Request] {
     case Method.GET -> !! / "example" =>
@@ -32,4 +32,10 @@ object Get extends GetInterface:
     case _ => ZIO.succeed(Response.status(Status.NotFound))
   }
 
-end Get
+}
+
+object Get {
+  val live: ULayer[Get] = ZLayer.succeed(
+    Get()
+  )
+}

@@ -1,102 +1,88 @@
 package github.com.dpratt747
 package db.session
 
-import cats.effect.*
-import cats.effect.kernel.Sync
-import cats.effect.std.Console
-import cats.syntax.all.*
-import com.typesafe.config.Config
-import com.typesafe.config.ConfigFactory
-import com.typesafe.config.ConfigObject
-import github.com.dpratt747.config.ApplicationConfig
-import github.com.dpratt747.config.DBConfig
-import github.com.dpratt747.config.*
-import github.com.dpratt747.domain.*
+import config.*
+import db.domain.UserTable
+import domain.*
+
+import com.typesafe.config.{Config, ConfigFactory, ConfigObject}
 import io.getquill.*
 import io.getquill.context.ZioJdbc.*
 import io.getquill.jdbczio.Quill
 import zio.*
-import zio.interop.*
-import zio.interop.catz.*
+import zio.config.magnolia
 
 import java.sql.SQLException
 import javax.sql.DataSource
-import db.domain.UserTable
-import domain.*
-
-import zio.config.magnolia
 
 trait PostgresContextAlg {
-  def pgContext: PostgresZioJdbcContext[SnakeCase.type]
+  def context: PostgresZioJdbcContext[SnakeCase.type]
 }
 
-final case class PostgresContext(private val config: DBConfig)
-    extends PostgresContextAlg {
+final case class PostgresContext(
+    private val dbConfig: DBConfig
+) extends PostgresContextAlg {
 
-  val pgContext: PostgresZioJdbcContext[SnakeCase.type] =
-    new PostgresZioJdbcContext(config.tableNameCase)
+  val context: PostgresZioJdbcContext[SnakeCase.type] =
+    new PostgresZioJdbcContext(dbConfig.tableNameCase)
 
 }
 
 object PostgresContext {
-  val live: ZLayer[ApplicationConfig, Nothing, PostgresContextAlg] =
-    ZLayer.fromZIO {
-      for {
-        config <- ZIO.serviceWith[ApplicationConfig](_.postgres)
-      } yield PostgresContext(config)
-    }
-}
 
-trait PostgresDataSourceAlg {
-  def dataSource: ZLayer[Any, Throwable, DataSource]
-}
-
-final case class PostgresDataSource(private val config: Config)
-    extends PostgresDataSourceAlg {
-
-  def dataSource: ZLayer[Any, Throwable, DataSource] = Quill.DataSource.fromConfig(config)
-
-}
-
-object PostgresDataSource {
-
-  val live: ZLayer[ApplicationConfig, Throwable, PostgresDataSourceAlg] = {
-    import zio.config.typesafe.*
+  val live: ZLayer[ApplicationConfig, Nothing, DataSource & PostgresContext] = {
     import zio.config.*
-    import zio.config.*, zio.config.typesafe.*
+    import ConfigDescriptor.*
     import zio.config.magnolia.*
-    import zio.config.*, ConfigDescriptor.*
+    import zio.config.typesafe.*
 
-    given portDescriptor: Descriptor[Port] = magnolia.Descriptor.from(descriptor[Int].transform[Port](Port(_), _.asInt))
+    given portDescriptor: Descriptor[Port] = magnolia.Descriptor.from(
+      descriptor[Int].transform[Port](Port(_), _.asInt)
+    )
 
-    given userNameDescriptor: Descriptor[UserName] = magnolia.Descriptor.from(descriptor[String].transform[UserName](UserName(_), _.asString))
+    given connectionTimeoutDescriptor: Descriptor[ConnectionTimeout] = magnolia.Descriptor.from(
+      descriptor[Int].transform[ConnectionTimeout](ConnectionTimeout(_), _.asInt)
+    )
 
-    given passwordDescriptor: Descriptor[Password] = magnolia.Descriptor.from(descriptor[String].transform[Password](Password(_), _.asString))
+    given userNameDescriptor: Descriptor[UserName] = magnolia.Descriptor.from(
+      descriptor[String].transform[UserName](UserName(_), _.asString)
+    )
 
-    given databaseDescriptor: Descriptor[Database] = magnolia.Descriptor.from(descriptor[String].transform[Database](Database(_), _.asString))
+    given passwordDescriptor: Descriptor[Password] = magnolia.Descriptor.from(
+      descriptor[String].transform[Password](Password(_), _.asString)
+    )
 
-    given serverNameDescriptor: Descriptor[ServerName] = magnolia.Descriptor.from(descriptor[String].transform[ServerName](ServerName(_), _.asString))
+    given databaseDescriptor: Descriptor[Database] = magnolia.Descriptor.from(
+      descriptor[String].transform[Database](Database(_), _.asString)
+    )
 
-    val descriptorDataSourceConfig: ConfigDescriptor[DataSourceConfig] = descriptor[DataSourceConfig]
+    given serverNameDescriptor: Descriptor[ServerName] =
+      magnolia.Descriptor.from(
+        descriptor[String].transform[ServerName](ServerName(_), _.asString)
+      )
 
-    def toTypeSafeConfig(config: DataSourceConfig): ZIO[Any, Throwable, Config] = for {
+    val postgresConfigDescriptor: ConfigDescriptor[DBConfig] = descriptor[DBConfig]
+
+    def toTypeSafeConfig(
+        config: DBConfig
+    ): ZIO[Any, Throwable, Config] = for {
       configObject <- ZIO
-        .fromEither(config.toHocon(descriptorDataSourceConfig))
+        .fromEither(config.toHocon(postgresConfigDescriptor))
         .orElseFail(
           new RuntimeException("failed to create a typesafe config object")
         )
       newConfig <- ZIO.attempt(configObject.toConfig())
     } yield newConfig
 
-    val configLayer: ZLayer[ApplicationConfig, Throwable, Config] =
-      ZLayer.fromZIO(for {
-        config: DBConfig <- ZIO.serviceWith[ApplicationConfig](_.postgres)
-        toTpeSafe <- toTypeSafeConfig(config.dataSource)
-      } yield toTpeSafe)
 
-    configLayer.flatMap { (config: ZEnvironment[Config]) =>
-      PostgresDataSource(config.get)
+    ZLayer.service[ApplicationConfig].flatMap{ env =>
+      val pgConfig = env.get.postgres
+      val typeSafeConfig = toTypeSafeConfig(pgConfig)
+
+      val dataSourceLayer: ULayer[DataSource] = ZLayer.fromZIO(typeSafeConfig).flatMap(conf => Quill.DataSource.fromConfig(conf.get)).orDie
+      val contextLayer: ULayer[PostgresContext] = ZLayer.succeed(PostgresContext(pgConfig))
+
+      dataSourceLayer ++ contextLayer
     }
   }
-
 }
